@@ -96,6 +96,26 @@ class Calculator:
         self._record("power", base, exponent, result)
         return result
     
+    def square_root(self, a: float) -> float:
+        """
+        Calculate the square root of a number.
+        
+        Args:
+            a: The number to find the square root of
+            
+        Returns:
+            Square root of a
+            
+        Raises:
+            ValueError: If a is negative
+        """
+        import math
+        if a < 0:
+            raise ValueError("Cannot calculate square root of a negative number")
+        result = math.sqrt(a)
+        self._record("square_root", a, 0, result)
+        return result
+    
     def _record(self, operation: str, a: float, b: float, result: float):
         """Record an operation in history."""
         self.history.append({
@@ -144,6 +164,9 @@ def quick_calculate(expression: str) -> float:
     
     a, op, b = float(parts[0]), parts[1], float(parts[2])
     
+    if op == "sqrt":
+        return calc.square_root(a)
+        
     operations = {
         "+": calc.add,
         "-": calc.subtract,

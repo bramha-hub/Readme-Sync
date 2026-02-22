@@ -1,25 +1,8 @@
 diff --git a/README.md b/README.md
-index aed0f96..47f5f3a 100644
+index 71f6d40..47f5f3a 100644
 --- a/README.md
 +++ b/README.md
-@@ -6,238 +6,15 @@ README-Sync is a GitHub Action that uses AI to keep your documentation in sync w
- 
- ## ✨ Features
- 
--- **🔬 Structure-Aware Analysis**: Uses AST parsing (not regex) to extract exact function signatures, preventing hallucinations
--- **🤖 AI-Powered Updates**: Leverages Google Gemini to generate human-readable documentation
--- **🎯 Precision Targeting**: Only updates technical details that changed, preserving your tone and style
--- **🔄 Automated PRs**: Creates pull requests instead of direct commits, giving you full control
--- **🌐 Multi-Language**: Supports Python, JavaScript, and TypeScript out of the box
--- **⚙️ Configurable**: Customize which files to monitor, what to update, and how the AI behaves
-+-   **🔬 Structure-Aware Analysis**: Uses AST parsing (not regex) to extract exact function signatures, preventing hallucinations
-+-   **🤖 AI-Powered Updates**: Leverages Google Gemini to generate human-readable documentation
-+-   **🎯 Precision Targeting**: Only updates technical details that changed, preserving your tone and style
-+-   **🔄 Automated PRs**: Creates pull requests instead of direct commits, giving you full control
-+-   **🌐 Multi-Language**: Supports Python, JavaScript, and TypeScript out of the box
-+-   **⚙️ Configurable**: Customize which files to monitor, what to update, and how the AI behaves
- 
- ## 🚀 Quick Start
+@@ -17,253 +17,4 @@ README-Sync is a GitHub Action that uses AI to keep your documentation in sync w
  
  ### 1. Add to Your Repository
  
@@ -31,221 +14,247 @@ index aed0f96..47f5f3a 100644
 -on:
 -  push:
 -    branches: [main]
+-  pull_request:
+-    types: [opened, synchronize]
+-
+-permissions:
+-  contents: write
+-  pull-requests: write
 -
 -jobs:
 -  sync-readme:
 -    runs-on: ubuntu-latest
 -    steps:
--      - uses: actions/checkout@v4
+-      - name: Checkout
+-        uses: actions/checkout@v4
 -        with:
 -          fetch-depth: 0
--      
--      - uses: actions/setup-python@v5
+-
+-      - name: Run README-Sync
+-        uses: bramha-hub/readme-sync@main
 -        with:
--          python-version: '3.11'
--      
--      - name: Install README-Sync
--        run: |
--          pip install -r requirements.txt
--      
--      - name: Run Sync
--        env:
--          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
--        run: python src/sync_readme.py
+-          gemini-api-key: ${{ secrets.GEMINI_API_KEY }}
+-          github-token: ${{ secrets.GITHUB_TOKEN }}
 -```
 -
--### 2. Configure Secrets
+-That's it — **one file** is all you need. README-Sync will automatically handle change detection, AI generation, and PR creation. 🎉
 -
--Add your Gemini API key to GitHub Secrets:
--1. Go to your repository → Settings → Secrets and variables → Actions
--2. Click "New repository secret"
--3. Name: `GEMINI_API_KEY`
--4. Value: Your API key from [Google AI Studio](https://makersuite.google.com/app/apikey)
+----
 -
--### 3. Customize (Optional)
+-### 2. Add Your Gemini API Key
 -
--Edit `config.yml` to customize behavior:
+-Get a free key from [Google AI Studio](https://aistudio.google.com/app/apikey), then add it as a repository secret:
+-
+-1. Go to your repo → **Settings → Secrets and variables → Actions**
+-2. Click **New repository secret**
+-3. Name: `GEMINI_API_KEY` · Value: your key
+-
+-README-Sync will now run every time you push code and create a PR with updated documentation.
+-
+----
+-
+-## ⚙️ Configuration (Optional)
+-
+-README-Sync works out of the box with sensible defaults. To customize behaviour, create `config.yml` in your repository root:
 -
 -```yaml
+-# Files to monitor for changes
 -monitored_extensions:
 -  - .py
 -  - .js
 -  - .ts
+-  - .jsx
+-  - .tsx
 -
+-# Documentation files to keep in sync
 -documentation_files:
 -  - README.md
--  - docs/API.md
 -
--llm:
--  model: gemini-1.5-pro
--  temperature: 0.3
--```
--
--## 📖 How It Works
--
--```mermaid
--graph LR
--    A[Code Push] --> B[Detect Changes]
--    B --> C[Extract with AST]
--    C --> D[Build Prompt]
--    D --> E[LLM Analysis]
--    E --> F[Generate Docs]
--    F --> G[Create PR]
--```
--
--1. **Trigger**: Runs on every push to main branch
--2. **Analysis**: Extracts git diff and parses changed files with AST
--3. **Context**: Builds structured prompt with current docs + code changes
--4. **Generation**: Sends to Gemini API for intelligent updates
--5. **Review**: Creates a PR with the proposed documentation changes
--
--## 🛠️ Configuration Reference
--
--### Monitored Extensions
--
--```yaml
--monitored_extensions:
--  - .py      # Python
--  - .js      # JavaScript
--  - .ts      # TypeScript
--  - .jsx     # React
--  - .tsx     # React TypeScript
--```
--
--### Exclude Patterns
--
--```yaml
+-# Paths to exclude from analysis
 -exclude_patterns:
 -  - "**/test_*.py"
+-  - "**/*_test.py"
 -  - "**/tests/**"
 -  - "**/node_modules/**"
--```
+-  - "**/__pycache__/**"
+-  - "**/dist/**"
+-  - "**/build/**"
 -
--### LLM Settings
--
--```yaml
+-# LLM configuration
 -llm:
 -  provider: gemini
--  model: gemini-1.5-pro    # or gemini-1.5-flash for faster responses
--  temperature: 0.3         # Lower = more deterministic
--  max_tokens: 4096
--```
+-  model: models/gemini-2.5-flash   # Latest Gemini Flash model
+-  temperature: 0.3                  # Lower = more deterministic output
+-  max_tokens: 16384
 -
--### Update Rules
--
--```yaml
+-# Documentation update rules
 -update_rules:
--  preserve_tone: true              # Keep your writing style
--  preserve_style: true             # Maintain formatting
--  update_technical_details: true   # Update signatures, params
--  update_examples: true            # Refresh code examples
+-  preserve_tone: true               # Keep your original writing voice
+-  preserve_style: true              # Keep your existing formatting
+-  update_technical_details: true    # Reflect new/changed API details
+-  update_examples: true             # Update code examples
 -  add_breaking_changes_section: true
 -```
 -
--## 🧪 Local Testing
+-### Configuration Reference
 -
--Test the sync locally before pushing:
--
--```bash
--# Install dependencies
--pip install -r requirements.txt
--
--# Set your API key
--export GEMINI_API_KEY="your-key-here"
--
--# Run the sync
--python src/sync_readme.py
--```
--
--## 🏗️ Architecture
--
--### Components
--
--- **`sync_readme.py`**: Main orchestration script
--- **`parsers/`**: Language-specific AST parsers
--  - `python_parser.py`: Python AST extraction
--  - `javascript_parser.py`: JS/TS regex-based parsing
--- **`prompt_builder.py`**: Constructs structured LLM prompts
--- **`llm_client.py`**: Gemini API integration
--
--### Parser Example
--
--```python
--from parsers import ParserFactory
--
--factory = ParserFactory()
--analysis = factory.parse_file("example.py", content)
--
--for func in analysis.functions:
--    print(f"{func.name}({', '.join(func.parameters)})")
--```
--
--```
--
--## 📚 API Reference
--
--### Test Workflow Module
--
--The `test_workflow.py` module provides example functions for testing README-Sync:
--
--#### `greet_user(name: str) -> str`
--
--Greet a user by name.
--
--**Parameters:**
--- `name` (str): The name of the user to greet
--
--**Returns:**
--- str: A greeting message
--
--**Example:**
--```python
--from test_workflow import greet_user
--message = greet_user("Alice")
--print(message)  # "Hello, Alice! Welcome to README-Sync!"
--```
--
--#### `calculate_total(items: list[float]) -> float`
--
--Calculate the total sum of items.
--
--**Parameters:**
--- `items` (list[float]): List of numbers to sum
--
--**Returns:**
--- float: The total sum of all items
--
--#### `DocumentationHelper`
--
--Helper class for documentation operations.
--
--**Methods:**
--- `__init__(project_name: str)`: Initialize with project name
--- `update_docs(content: str) -> bool`: Update documentation with new content
--
--## 🤝 Contributing
--
--Contributions welcome! Areas for improvement:
--
--- [ ] Add support for more languages (Go, Rust, Java)
--- [ ] Implement proper JS/TS AST parsing (replace regex)
--- [ ] Add unit tests
--- [ ] Support for other LLM providers (OpenAI, Anthropic)
--- [ ] Detect breaking changes automatically
--
--## 📝 License
--
--MIT License - feel free to use in your projects!
--
--## 🙏 Acknowledgments
--
--Built with:
--- [Google Gemini](https://ai.google.dev/) for AI-powered documentation
--- [PyGithub](https://github.com/PyGithub/PyGithub) for GitHub API
--- [GitPython](https://github.com/gitpython-developers/GitPython) for git operations
+-| Option | Default | Description |
+-|--------|---------|-------------|
+-| `monitored_extensions` | `.py`, `.js`, `.ts`, `.jsx`, `.tsx` | File types that trigger a README update |
+-| `documentation_files` | `README.md` | Files to keep updated |
+-| `exclude_patterns` | `**/tests/**`, etc. | Glob patterns to ignore |
+-| `llm.model` | `models/gemini-2.5-flash` | Gemini model to use |
+-| `llm.temperature` | `0.3` | Lower = more deterministic |
+-| `llm.max_tokens` | `16384` | Maximum tokens in AI response |
+-| `update_rules.preserve_tone` | `true` | Preserve your writing voice |
+-| `update_rules.preserve_style` | `true` | Preserve your formatting |
 -
 ----
 -
--**Made for developers who hate outdated docs**
+-## 🔍 How It Works
+-
+-```
+-Code Push → Change Detection → AST Parsing → AI Generation → Pull Request
+-```
+-
+-1. **Change Detection** — On every push, README-Sync checks which source files changed using `git diff`
+-2. **AST Parsing** — Changed files are parsed with Python's built-in `ast` module (or regex for JS/TS) to extract exact function signatures, class definitions, and docstrings — no guessing
+-3. **Prompt Building** — A structured prompt is assembled containing the current README, the code diff, and the extracted structure
+-4. **AI Generation** — Google Gemini generates an updated README that accurately describes the new/changed code
+-5. **Pull Request** — The updated README is committed to a new branch and a pull request is opened for your review
+-
+-> README-Sync **always creates a PR** — it never commits directly to your main branch.
+-
+----
+-
+-## 🏗️ Architecture
+-
+-```
+-readme-sync/
+-├── action.yml                    ← GitHub Action entry point (what users reference)
+-├── config.yml                    ← Default configuration (bundled with the action)
+-├── requirements.txt
+-├── src/
+-│   ├── sync_readme.py            ← Main orchestration pipeline
+-│   ├── llm_client.py             ← Google Gemini API wrapper
+-│   ├── prompt_builder.py         ← Structured prompt construction
+-│   └── parsers/
+-│       ├── base.py               ← Parser interface & shared data models
+-│       ├── python_parser.py      ← Python AST parser
+-│       └── javascript_parser.py  ← JavaScript / TypeScript parser
+-└── .github/workflows/
+-    └── readme-sync.yml           ← Workflow used by this repository itself
+-```
+-
+-### Key Components
+-
+-| Component | Description |
+-|-----------|-------------|
+-| `sync_readme.py` | Orchestrates the full pipeline: detect → parse → build prompt → generate → update |
+-| `llm_client.py` | Wraps the Gemini API; handles response extraction and error handling |
+-| `prompt_builder.py` | Builds prompts with code diffs, AST structure, and changelog-preservation rules |
+-| `python_parser.py` | Uses Python's `ast` module — full support for type hints, decorators, docstrings |
+-| `javascript_parser.py` | Regex-based extraction for JS/TS (functions, classes, imports) |
+-
+----
+-
+-## 🌐 Supported Languages
+-
+-| Language | Parser | What is extracted |
+-|----------|--------|-------------------|
+-| Python | AST | Functions, classes, methods, type hints, docstrings, decorators |
+-| JavaScript | Regex | Functions (declarations + arrow), classes, imports |
+-| TypeScript | Regex | Functions, classes, imports |
+-| JSX / TSX | Regex | Component functions, classes |
+-
+-> More languages (Go, Rust, Java) are planned. Contributions are welcome!
+-
+----
+-
+-## 🔒 Permissions
+-
+-The workflow needs two permissions:
+-
+-```yaml
+-permissions:
+-  contents: write       # Creates branches and commits the updated README
+-  pull-requests: write  # Opens the documentation PR
+-```
+-
+-These are scoped to the action only and follow GitHub's minimum-permission principle. The `GITHUB_TOKEN` is automatically provided by GitHub — no extra secrets needed beyond your Gemini key.
+-
+----
+-
+-## 🛠️ Local Development
+-
+-Clone the repo and run the demo locally:
+-
+-```bash
+-git clone https://github.com/bramha-hub/readme-sync.git
+-cd readme-sync
+-pip install -r requirements.txt
+-
+-# See the parser and prompt builder in action
+-python demo.py
+-
+-# Run the unit tests
+-pytest tests/
+-```
+-
+-To test the full sync pipeline locally (requires a Gemini API key):
+-
+-```bash
+-export GEMINI_API_KEY=your_key_here
+-python src/sync_readme.py
+-```
+-
+----
+-
+-## 🤝 Contributing
+-
+-Contributions are very welcome! Here's how to get started:
+-
+-1. Fork this repository
+-2. Create a feature branch: `git checkout -b feature/my-feature`
+-3. Make your changes and add tests in `tests/`
+-4. Run the test suite: `pytest tests/`
+-5. Open a pull request
+-
+-### Ideas for Contributions
+-
+-- Add proper AST parsing for JavaScript/TypeScript (replace regex approach)
+-- Support additional languages: Go, Rust, Java, C#
+-- Add support for other LLM providers (OpenAI, Anthropic Claude)
+-- Improve changelog preservation heuristics
+-- Add caching for large repositories
+-- Write more comprehensive unit tests
+-
+----
+-
+-## 📄 License
+-
+-MIT License — see [LICENSE](LICENSE) for details.
+-
+----
+-
+-## 📝 Changelog
+-
+-### 2026-02-22
+-- feat: add `action.yml` — users now reference this repo as a GitHub Action; one workflow file is all that's needed
+-- feat: `sync_readme.py` now respects `CONFIG_PATH` env variable and falls back to the bundled `config.yml` when none is found in the target repository
+-- fix: remove `docs/API.md` from default `documentation_files` (file did not exist, causing spurious warnings)
+-- fix: update `.github/workflows/readme-sync.yml` with path filters to prevent workflow loops on README-only changes
+-
+-### 2025-XX-XX
+-- feat: add `square_root` method to `Calculator` and update `quick_calculate`
+-- fix: increase `max_tokens` to 16384 for comprehensive README output
+-- fix: improve prompt instructions to better preserve existing README content
+-- feat: add example calculator module with operation history tracking
+-- fix: migrate from `google-generativeai` to the new `google-genai` SDK
+-- fix: replace `peter-evans/create-pull-request` with native `gh` CLI for PR creation
+-
+----
+-
+-*Built with ❤️ using [Google Gemini](https://deepmind.google/technologies/gemini/) and Python AST*
 +Create `.github/workflows/readme-sync.yml`:
 \ No newline at end of file

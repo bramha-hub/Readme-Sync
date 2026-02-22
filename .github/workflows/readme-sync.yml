@@ -5,8 +5,28 @@ on:
     branches:
       - main
       - develop
+    # Only run when source code files change, not when README or docs are updated.
+    # This prevents infinite loops when the bot commits the README back to main.
+    paths:
+      - 'src/**'
+      - 'example_calculator.py'
+      - 'examples/**'
+      - '*.py'
+      - '*.js'
+      - '*.ts'
+      - '*.jsx'
+      - '*.tsx'
   pull_request:
     types: [opened, synchronize]
+    paths:
+      - 'src/**'
+      - 'example_calculator.py'
+      - 'examples/**'
+      - '*.py'
+      - '*.js'
+      - '*.ts'
+      - '*.jsx'
+      - '*.tsx'
 
 permissions:
   contents: write

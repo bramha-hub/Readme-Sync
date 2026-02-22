@@ -36,7 +36,31 @@ class ReadmeSync:
         )
     
     def _load_config(self, config_path: str) -> dict:
-        """Load configuration from YAML file."""
+        """Load configuration from YAML file.
+
+        Falls back to the bundled default config when the specified path
+        does not exist (e.g. when running as a GitHub Action in a repo
+        that has no config.yml of its own).
+        """
+        if not os.path.exists(config_path):
+            # Try the action's own bundled config (one level above src/)
+            action_path = os.getenv('ACTION_PATH', '')
+            bundled = os.path.join(action_path, 'config.yml') if action_path else ''
+            if bundled and os.path.exists(bundled):
+                print(f"ℹ️  No config.yml found — using bundled default from {bundled}")
+                config_path = bundled
+            else:
+                # Last resort: look next to this script's directory
+                script_dir = os.path.dirname(os.path.abspath(__file__))
+                parent_config = os.path.join(os.path.dirname(script_dir), 'config.yml')
+                if os.path.exists(parent_config):
+                    print(f"ℹ️  No config.yml found — using bundled default from {parent_config}")
+                    config_path = parent_config
+                else:
+                    raise FileNotFoundError(
+                        f"Configuration file not found: {config_path}. "
+                        "Create a config.yml in your repository root or provide one via the config-path input."
+                    )
         with open(config_path, 'r') as f:
             return yaml.safe_load(f)
     
@@ -302,9 +326,15 @@ class ReadmeSync:
 
 
 def main():
-    """Entry point."""
+    """Entry point.
+
+    Respects the CONFIG_PATH environment variable so this script can be
+    invoked as a GitHub Action in any repository without requiring that
+    repo to have its own config.yml.
+    """
+    config_path = os.getenv('CONFIG_PATH', 'config.yml')
     try:
-        sync = ReadmeSync()
+        sync = ReadmeSync(config_path=config_path)
         sync.run()
     except Exception as e:
         print(f"❌ Fatal error: {e}")

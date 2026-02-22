@@ -1,0 +1,160 @@
+name: 'README-Sync'
+description: 'Automatically update your README when code changes, using AST parsing and Google Gemini AI'
+author: 'bramha-hub'
+
+branding:
+  icon: 'refresh-cw'
+  color: 'blue'
+
+inputs:
+  gemini-api-key:
+    description: 'Google Gemini API key for AI documentation generation'
+    required: true
+  github-token:
+    description: 'GitHub token for creating branches and pull requests'
+    required: false
+    default: ${{ github.token }}
+  config-path:
+    description: 'Path to a custom config.yml in your repository (optional; uses bundled defaults if not found)'
+    required: false
+    default: 'config.yml'
+  base-branch:
+    description: 'Base branch name for pull requests created by this action'
+    required: false
+    default: 'main'
+
+outputs:
+  readme-updated:
+    description: 'Whether the README was updated (true or false)'
+    value: ${{ steps.check_changes.outputs.has_readme_changes }}
+  pr-url:
+    description: 'URL of the pull request created with the README changes'
+    value: ${{ steps.create_pr.outputs.pr_url }}
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+
+    - name: Install dependencies
+      shell: bash
+      run: pip install "google-genai>=1.0.0" "PyYAML>=6.0.1" "GitPython>=3.1.40"
+
+    - name: Configure Git
+      shell: bash
+      run: |
+        git config --global user.name "README-Sync Bot"
+        git config --global user.email "readme-sync[bot]@users.noreply.github.com"
+
+    - name: Detect code changes
+      id: code_changes
+      shell: bash
+      run: |
+        if [ "${{ github.event_name }}" == "pull_request" ]; then
+          BASE_REF="${{ github.event.pull_request.base.sha }}"
+        else
+          if git rev-parse HEAD~1 >/dev/null 2>&1; then
+            BASE_REF="HEAD~1"
+          else
+            BASE_REF="$(git hash-object -t tree /dev/null)"
+          fi
+        fi
+
+        CHANGED=$(git diff --name-only "$BASE_REF" HEAD 2>/dev/null | grep -E '\.(py|js|ts|jsx|tsx)$' || true)
+        if [ -n "$CHANGED" ]; then
+          echo "has_changes=true" >> $GITHUB_OUTPUT
+          echo "Code files changed:"
+          echo "$CHANGED"
+        else
+          echo "has_changes=false" >> $GITHUB_OUTPUT
+          echo "No relevant code files changed — skipping README sync."
+        fi
+
+    - name: Run README Sync
+      id: sync
+      if: steps.code_changes.outputs.has_changes == 'true'
+      shell: bash
+      env:
+        GEMINI_API_KEY: ${{ inputs.gemini-api-key }}
+        GITHUB_TOKEN: ${{ inputs.github-token }}
+        GITHUB_REPOSITORY: ${{ github.repository }}
+        CONFIG_PATH: ${{ inputs.config-path }}
+        ACTION_PATH: ${{ github.action_path }}
+      run: python "${{ github.action_path }}/src/sync_readme.py"
+
+    - name: Check for README changes
+      id: check_changes
+      if: steps.code_changes.outputs.has_changes == 'true'
+      shell: bash
+      run: |
+        if git diff --quiet README.md 2>/dev/null; then
+          echo "has_readme_changes=false" >> $GITHUB_OUTPUT
+          echo "README is already up to date."
+        else
+          echo "has_readme_changes=true" >> $GITHUB_OUTPUT
+          echo "README was updated."
+          git diff README.md > readme_diff.txt || true
+        fi
+
+    - name: Post README diff as PR comment
+      if: github.event_name == 'pull_request' && steps.check_changes.outputs.has_readme_changes == 'true'
+      uses: actions/github-script@v7
+      with:
+        github-token: ${{ inputs.github-token }}
+        script: |
+          const fs = require('fs');
+          let body = '### 🤖 README-Sync Preview\n\nThe README was updated to reflect code changes in this PR.\n\n';
+          if (fs.existsSync('readme_diff.txt')) {
+            const diff = fs.readFileSync('readme_diff.txt', 'utf8');
+            body += `<details>\n<summary>📝 View Diff</summary>\n\n\`\`\`diff\n${diff.slice(0, 8000)}\n\`\`\`\n\n</details>\n`;
+          }
+          body += '\n*Review the diff above. Changes will apply when this PR is merged.*';
+          await github.rest.issues.createComment({
+            issue_number: context.issue.number,
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            body
+          });
+
+    - name: Commit changes and open PR
+      id: create_pr
+      if: github.event_name == 'push' && steps.check_changes.outputs.has_readme_changes == 'true'
+      shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.github-token }}
+      run: |
+        BRANCH="docs/readme-sync-${{ github.run_number }}"
+        git checkout -b "$BRANCH"
+        git add README.md readme_diff.txt 2>/dev/null || git add README.md
+        git commit -m "docs: Auto-update README documentation"
+        git push origin "$BRANCH"
+
+        PR_URL=$(gh pr create \
+          --title "docs: Auto-update README documentation" \
+          --body "## 🤖 Automated README Update
+
+        This PR was generated by [README-Sync](https://github.com/bramha-hub/readme-sync).
+
+        ### What changed
+        Code changes were detected and the README was updated to reflect them using AST parsing and AI generation.
+
+        ### Review Checklist
+        - [ ] Technical accuracy of the documentation
+        - [ ] Tone and writing style preserved
+        - [ ] Changelog history intact
+        - [ ] No sections accidentally removed
+
+        ---
+        *Auto-generated — review before merging.*" \
+          --base "${{ inputs.base-branch }}" \
+          --head "$BRANCH" 2>&1 || echo "")
+
+        echo "pr_url=$PR_URL" >> $GITHUB_OUTPUT
+        if [ -n "$PR_URL" ]; then
+          echo "✅ PR created: $PR_URL"
+        else
+          echo "⚠️  PR creation failed. Check that the GITHUB_TOKEN has pull-requests: write permission."
+        fi

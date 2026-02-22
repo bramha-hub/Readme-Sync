@@ -11,7 +11,6 @@ monitored_extensions:
 # Documentation files to update
 documentation_files:
   - README.md
-  - docs/API.md
 
 # Paths to exclude from analysis
 exclude_patterns:
